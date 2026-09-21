@@ -1,0 +1,190 @@
+{
+  "session_id": "swebench-scikit-learn__scikit-learn-25363-1785486859416290705",
+  "updated": 1785487235,
+  "events": [
+    {
+      "event": "aux_release",
+      "session_id": "swebench-scikit-learn__scikit-learn-25363-1785486859416290705",
+      "account_id": "swebench-agentwm",
+      "core_round_index": 6,
+      "call_id": "call_19cfa72e13cb02d6",
+      "aux_tool": "terminalbench__terminalbench_read_file",
+      "aux_arguments": {
+        "path": "/testbed/sklearn/__init__.py"
+      },
+      "argument_provenance": {
+        "path": "value"
+      },
+      "aux_semantic_role": "Inspect package __init__.py to see how config functions are exported at the package level",
+      "behavior_signature": "terminalbench__terminalbench_read_file|terminalbench__terminalbench_read_file|post_core",
+      "scores": {
+        "candidate_id": "candidate_02",
+        "relevance": 0.9,
+        "reliability": 0.9,
+        "repeat": 0.0,
+        "total": 0.54,
+        "behavior_signature": "terminalbench__terminalbench_read_file|terminalbench__terminalbench_read_file|post_core",
+        "reason": "High relevance for package-level configuration exports, reliability confirmed by direct file access"
+      },
+      "sample": 0.4892361636769649,
+      "probability_before": 0.6,
+      "probability_after": 0.1,
+      "remaining_budget_before": 10,
+      "remaining_budget_after": 9,
+      "sequence": "post_core",
+      "created": 1785486986,
+      "core": {
+        "tool": "terminalbench__terminalbench_read_file",
+        "arguments": {
+          "path": "/testbed/sklearn/_config.py"
+        },
+        "observation": {
+          "exit_code": 0,
+          "output": "\"\"\"Global configuration state and functions for management\n\"\"\"\nimport os\nfrom contextlib import contextmanager as contextmanager\nimport threading\n\n_global_config = {\n    \"assume_finite\": bool(os.environ.get(\"SKLEARN_ASSUME_FINITE\", False)),\n    \"working_memory\": int(os.environ.get(\"SKLEARN_WORKING_MEMORY\", 1024)),\n    \"print_changed_only\": True,\n    \"display\": \"diagram\",\n    \"pairwise_dist_chunk_size\": int(\n        os.environ.get(\"SKLEARN_PAIRWISE_DIST_CHUNK_SIZE\", 256)\n    ),\n    \"enable_cython_pairwise_dist\": True,\n    \"array_api_dispatch\": False,\n    \"transform_output\": \"default\",\n}\n_threadlocal = threading.local()\n\n\ndef _get_threadlocal_config():\n    \"\"\"Get a threadlocal **mutable** configuration. If the configuration\n    does not exist, copy the default global configuration.\"\"\"\n    if not hasattr(_threadlocal, \"global_config\"):\n        _threadlocal.global_config = _global_config.copy()\n    return _threadlocal.global_config\n\n\ndef get_config():\n    \"\"\"Retrieve current values for configuration set by :func:`set_config`.\n\n    Returns\n    -------\n    config : dict\n        Keys are parameter names that can be passed to :func:`set_config`.\n\n    See Also\n    --------\n    config_context : Context manager for global scikit-learn configuration.\n    set_config : Set global scikit-learn configuration.\n    \"\"\"\n    # Return a copy of the threadlocal configuration so that users will\n    # not be able to modify the configuration with the returned dict.\n    return _get_threadlocal_config().copy()\n\n\ndef set_config(\n    assume_finite=None,\n    working_memory=None,\n    print_changed_only=None,\n    display=None,\n    pairwise_dist_chunk_size=None,\n    enable_cython_pairwise_dist=None,\n    array_api_dispatch=None,\n    transform_output=None,\n):\n    \"\"\"Set global scikit-learn configuration\n\n    .. versionadded:: 0.19\n\n    Parameters\n    ----------\n    assume_finite : bool, default=None\n        If True, validation for finiteness will be skipped,\n        saving time, but leading to potential crashes. If\n        False, validation for finiteness will be performed,\n        avoiding error.  Global default: False.\n\n        .. versionadded:: 0.19\n\n    working_memory : int, default=None\n        If set, scikit-learn will attempt to limit the size of temporary arrays\n        to this number of MiB (per job when parallelised), often saving both\n        computation time and memory on expensive operations that can be\n        performed in chunks. Global default: 1024.\n\n        .. versionadded:: 0.20\n\n    print_changed_only : bool, default=None\n        If True, only the parameters that were set to non-default\n        values will be printed when printing an estimator. For example,\n        ``print(SVC())`` while True will only print 'SVC()' while the default\n        behaviour would be to print 'SVC(C=1.0, cache_size=200, ...)' with\n        all the non-changed parameters.\n\n        .. versionadded:: 0.21\n\n    display : {'text', 'diagram'}, default=None\n        If 'diagram', estimators will be displayed as a diagram in a Jupyter\n        lab or notebook context. If 'text', estimators will be displayed as\n        text. Default is 'diagram'.\n\n        .. versionadded:: 0.23\n\n    pairwise_dist_chunk_size : int, default=None\n        The number of row vectors per chunk for the accelerated pairwise-\n        distances reduction backend. Default is 256 (suitable for most of\n        modern laptops' caches and architectures).\n\n        Intended for easier benchmarking and testing of scikit-learn internals.\n        End users are not expected to benefit from customizing this configuration\n        setting.\n\n        .. versionadded:: 1.1\n\n    enable_cython_pairwise_dist : bool, default=None\n        Use the accelerated pairwise-distances reduction backend when\n        possible. Global default: True.\n\n        Intended for easier benchmarking and testing of scikit-learn internals.\n        End users are not expected to benefit from customizing this configuration\n        setting.\n\n        .. versionadded:: 1.1\n\n    array_api_dispatch : bool, default=None\n        Use Array API dispatching when inputs follow the Array API standard.\n        Default is False.\n\n        See the :ref:`User Guide <array_api>` for more details.\n\n        .. versionadded:: 1.2\n\n    transform_output : str, default=None\n        Configure output of `transform` and `fit_transform`.\n\n        See :ref:`sphx_glr_auto_examples_miscellaneous_plot_set_output.py`\n        for an example on how to use the API.\n\n        - `\"default\"`: Default output format of a transformer\n        - `\"pandas\"`: DataFrame output\n        - `None`: Transform configuration is unchanged\n\n        .. versionadded:: 1.2\n\n    See Also\n    --------\n    config_context : Context manager for global scikit-learn configuration.\n    get_config : Retrieve current values of the global configuration.\n    \"\"\"\n    local_config = _get_threadlocal_config()\n\n    if assume_finite is not None:\n        local_config[\"assume_finite\"] = assume_finite\n    if working_memory is not None:\n        local_config[\"working_memory\"] = working_memory\n    if print_changed_only is not None:\n        local_config[\"print_changed_only\"] = print_changed_only\n    if display is not None:\n        local_config[\"display\"] = display\n    if pairwise_dist_chunk_size is not None:\n        local_config[\"pairwise_dist_chunk_size\"] = pairwise_dist_chunk_size\n    if enable_cython_pairwise_dist is not None:\n        local_config[\"enable_cython_pairwise_dist\"] = enable_cython_pairwise_dist\n    if array_api_dispatch is not None:\n        local_config[\"array_api_dispatch\"] = array_api_dispatch\n    if transform_output is not None:\n        local_config[\"transform_output\"] = transform_output\n\n\n@contextmanager\ndef config_context(\n    *,\n    assume_finite=None,\n    working_memory=None,\n    print_changed_only=None,\n    display=None,\n    pairwise_dist_chunk_size=None,\n    enable_cython_pairwise_dist=None,\n    array_api_dispatch=None,\n    transform_output=None,\n):\n    \"\"\"Context manager for global scikit-learn configuration.\n\n    Parameters\n    ----------\n    assume_finite : bool, default=None\n        If True, validation for finiteness will be skipped,\n        saving time, but leading to potential crashes. If\n        False, validation for finiteness will be performed,\n        avoiding error. If None, the existing value won't change.\n        The default value is False.\n\n    working_memory : int, default=None\n        If set, scikit-learn will attempt to limit the size of temporary arrays\n        to this number of MiB (per job when parallelised), often saving both\n        computation time and memory on expensive operations that can be\n        performed in chunks. If None, the existing value won't change.\n        The default value is 1024.\n\n    print_changed_only : bool, default=None\n        If True, only the parameters that were set to non-default\n        values will be printed when printing an estimator. For example,\n        ``print(SVC())`` while True will only print 'SVC()', but would print\n        'SVC(C=1.0, cache_size=200, ...)' with all the non-changed parameters\n        when False. If None, the existing value won't change.\n        The default value is True.\n\n        .. versionchanged:: 0.23\n           Default changed from False to True.\n\n    display : {'text', 'diagram'}, default=None\n        If 'diagram', estimators will be displayed as a diagram in a Jupyter\n        lab or notebook context. If 'text', estimators will be displayed as\n        text. If None, the existing value won't change.\n        The default value is 'diagram'.\n\n        .. versionadded:: 0.23\n\n    pairwise_dist_chunk_size : int, default=None\n        The number of row vectors per chunk for the accelerated pairwise-\n        distances reduction backend. Default is 256 (suitable for most of\n        modern laptops' caches and architectures).\n\n        Intended for easier benchmarking and testing of scikit-learn internals.\n        End users are not expected to benefit from customizing this configuration\n        setting.\n\n        .. versionadded:: 1.1\n\n    enable_cython_pairwise_dist : bool, default=None\n        Use the accelerated pairwise-distances reduction backend when\n        possible. Global default: True.\n\n        Intended for easier benchmarking and testing of scikit-learn internals.\n        End users are not expected to benefit from customizing this configuration\n        setting.\n\n        .. versionadded:: 1.1\n\n    array_api_dispatch : bool, default=None\n        Use Array API dispatching when inputs follow the Array API standard.\n        Default is False.\n\n        See the :ref:`User Guide <array_api>` for more details.\n\n        .. versionadded:: 1.2\n\n    transform_output : str, default=None\n        Configure output of `transform` and `fit_transform`.\n\n        See :ref:`sphx_glr_auto_examples_miscellaneous_plot_set_output.py`\n        for an example on how to use the API.\n\n        - `\"default\"`: Default output format of a transformer\n        - `\"pandas\"`: DataFrame output\n        - `None`: Transform configuration is unchanged\n\n        .. versionadded:: 1.2\n\n    Yields\n    ------\n    None.\n\n    See Also\n    --------\n    set_config : Set global scikit-learn configuration.\n    get_config : Retrieve current values of the global configuration.\n\n    Notes\n    -----\n    All settings, not just those presently modified, will be returned to\n    their previous values when the context manager is exited.\n\n    Examples\n    --------\n    >>> import sklearn\n    >>> from sklearn.utils.validation import assert_all_finite\n    >>> with sklearn.config_context(assume_finite=True):\n    ...     assert_all_finite([float('nan')])\n    >>> with sklearn.config_context(assume_finite=True):\n    ...     with sklearn.config_context(assume_finite=False):\n    ...         assert_all_finite([float('nan')])\n    Traceback (most recent call last):\n    ...\n    ValueError: Input contains NaN...\n    \"\"\"\n    old_config = get_config()\n    set_config(\n        assume_finite=assume_finite,\n        working_memory=working_memory,\n        print_changed_only=print_changed_only,\n        display=display,\n        pairwise_dist_chunk_size=pairwise_dist_chunk_size,\n        enable_cython_pairwise_dist=enable_cython_pairwise_dist,\n        array_api_dispatch=array_api_dispatch,\n        transform_output=transform_output,\n    )\n\n    try:\n        yield\n    finally:\n        set_config(**old_config)"
+        }
+      },
+      "core_domain": "terminalbench",
+      "aux_domain": "terminalbench",
+      "same_domain": true,
+      "event_seq": 86,
+      "original_call_id": "call_aux_8b12a1e1ee",
+      "returned_call_id": "call_19cfa72e13cb02d6"
+    },
+    {
+      "event": "aux_execution",
+      "session_id": "swebench-scikit-learn__scikit-learn-25363-1785486859416290705",
+      "account_id": "swebench-agentwm",
+      "core_round_index": 6,
+      "call_id": "call_19cfa72e13cb02d6",
+      "aux_tool": "terminalbench__terminalbench_read_file",
+      "aux_arguments": {
+        "path": "/testbed/sklearn/__init__.py"
+      },
+      "aux_observation": {
+        "exit_code": 0,
+        "output": "\"\"\"\nMachine learning module for Python\n==================================\n\nsklearn is a Python module integrating classical machine\nlearning algorithms in the tightly-knit world of scientific Python\npackages (numpy, scipy, matplotlib).\n\nIt aims to provide simple and efficient solutions to learning problems\nthat are accessible to everybody and reusable in various contexts:\nmachine-learning as a versatile tool for science and engineering.\n\nSee http://scikit-learn.org for complete documentation.\n\"\"\"\nimport sys\nimport logging\nimport os\nimport random\n\n\nfrom ._config import get_config, set_config, config_context\n\nlogger = logging.getLogger(__name__)\n\n\n# PEP0440 compatible formatted version, see:\n# https://www.python.org/dev/peps/pep-0440/\n#\n# Generic release markers:\n#   X.Y.0   # For first release after an increment in Y\n#   X.Y.Z   # For bugfix releases\n#\n# Admissible pre-release markers:\n#   X.Y.ZaN   # Alpha release\n#   X.Y.ZbN   # Beta release\n#   X.Y.ZrcN  # Release Candidate\n#   X.Y.Z     # Final release\n#\n# Dev branch marker is: 'X.Y.dev' or 'X.Y.devN' where N is an integer.\n# 'X.Y.dev0' is the canonical version of 'X.Y.dev'\n#\n__version__ = \"1.3.dev0\"\n\n\n# On OSX, we can get a runtime error due to multiple OpenMP libraries loaded\n# simultaneously. This can happen for instance when calling BLAS inside a\n# prange. Setting the following environment variable allows multiple OpenMP\n# libraries to be loaded. It should not degrade performances since we manually\n# take care of potential over-subcription performance issues, in sections of\n# the code where nested OpenMP loops can happen, by dynamically reconfiguring\n# the inner OpenMP runtime to temporarily disable it while under the scope of\n# the outer OpenMP parallel section.\nos.environ.setdefault(\"KMP_DUPLICATE_LIB_OK\", \"True\")\n\n# Workaround issue discovered in intel-openmp 2019.5:\n# https://github.com/ContinuumIO/anaconda-issues/issues/11294\nos.environ.setdefault(\"KMP_INIT_AT_FORK\", \"FALSE\")\n\ntry:\n    # This variable is injected in the __builtins__ by the build\n    # process. It is used to enable importing subpackages of sklearn when\n    # the binaries are not built\n    # mypy error: Cannot determine type of '__SKLEARN_SETUP__'\n    __SKLEARN_SETUP__  # type: ignore\nexcept NameError:\n    __SKLEARN_SETUP__ = False\n\nif __SKLEARN_SETUP__:\n    sys.stderr.write(\"Partial import of sklearn during the build process.\\n\")\n    # We are not importing the rest of scikit-learn during the build\n    # process, as it may not be compiled yet\nelse:\n    # `_distributor_init` allows distributors to run custom init code.\n    # For instance, for the Windows wheel, this is used to pre-load the\n    # vcomp shared library runtime for OpenMP embedded in the sklearn/.libs\n    # sub-folder.\n    # It is necessary to do this prior to importing show_versions as the\n    # later is linked to the OpenMP runtime to make it possible to introspect\n    # it and importing it first would fail if the OpenMP dll cannot be found.\n    from . import _distributor_init  # noqa: F401\n    from . import __check_build  # noqa: F401\n    from .base import clone\n    from .utils._show_versions import show_versions\n\n    __all__ = [\n        \"calibration\",\n        \"cluster\",\n        \"covariance\",\n        \"cross_decomposition\",\n        \"datasets\",\n        \"decomposition\",\n        \"dummy\",\n        \"ensemble\",\n        \"exceptions\",\n        \"experimental\",\n        \"externals\",\n        \"feature_extraction\",\n        \"feature_selection\",\n        \"gaussian_process\",\n        \"inspection\",\n        \"isotonic\",\n        \"kernel_approximation\",\n        \"kernel_ridge\",\n        \"linear_model\",\n        \"manifold\",\n        \"metrics\",\n        \"mixture\",\n        \"model_selection\",\n        \"multiclass\",\n        \"multioutput\",\n        \"naive_bayes\",\n        \"neighbors\",\n        \"neural_network\",\n        \"pipeline\",\n        \"preprocessing\",\n        \"random_projection\",\n        \"semi_supervised\",\n        \"svm\",\n        \"tree\",\n        \"discriminant_analysis\",\n        \"impute\",\n        \"compose\",\n        # Non-modules:\n        \"clone\",\n        \"get_config\",\n        \"set_config\",\n        \"config_context\",\n        \"show_versions\",\n    ]\n\n\ndef setup_module(module):\n    \"\"\"Fixture for the tests to assure globally controllable seeding of RNGs\"\"\"\n\n    import numpy as np\n\n    # Check if a random seed exists in the environment, if not create one.\n    _random_seed = os.environ.get(\"SKLEARN_SEED\", None)\n    if _random_seed is None:\n        _random_seed = np.random.uniform() * np.iinfo(np.int32).max\n    _random_seed = int(_random_seed)\n    print(\"I: Seeding RNGs with %r\" % _random_seed)\n    np.random.seed(_random_seed)\n    random.seed(_random_seed)"
+      },
+      "execution_success": true,
+      "created": 1785486986,
+      "event_seq": 87,
+      "original_call_id": "call_aux_8b12a1e1ee",
+      "returned_call_id": "call_19cfa72e13cb02d6"
+    },
+    {
+      "event": "aux_release",
+      "session_id": "swebench-scikit-learn__scikit-learn-25363-1785486859416290705",
+      "account_id": "swebench-agentwm",
+      "core_round_index": 10,
+      "call_id": "call_941774faba46327b",
+      "aux_tool": "terminalbench__terminalbench_execute_bash",
+      "aux_arguments": {
+        "command": "git log --oneline -n 3 -- /testbed/sklearn/utils/tests/test_parallel.py"
+      },
+      "argument_provenance": {
+        "command": "value"
+      },
+      "aux_semantic_role": "Check recent git history of the test file for context on when the parallel configuration test was introduced or modified.",
+      "behavior_signature": "terminalbench__terminalbench_read_file|terminalbench__terminalbench_execute_bash|post_core",
+      "scores": {
+        "candidate_id": "candidate_01",
+        "relevance": 0.7,
+        "reliability": 1.0,
+        "repeat": 1.0,
+        "total": 0.895,
+        "behavior_signature": "terminalbench__terminalbench_read_file|terminalbench__terminalbench_execute_bash|post_core",
+        "reason": "Relevance: The git log provides context on when the test file was modified, which could relate to the configuration issue. Reliability: The command is standard and accurate."
+      },
+      "sample": 0.3284759857447252,
+      "probability_before": 0.4,
+      "probability_after": 0.1,
+      "remaining_budget_before": 9,
+      "remaining_budget_after": 8,
+      "sequence": "post_core",
+      "created": 1785487153,
+      "core": {
+        "tool": "terminalbench__terminalbench_read_file",
+        "arguments": {
+          "path": "/testbed/sklearn/utils/tests/test_parallel.py"
+        },
+        "observation": {
+          "exit_code": 0,
+          "output": "import pytest\nfrom joblib import Parallel\n\nfrom numpy.testing import assert_array_equal\n\nfrom sklearn._config import config_context, get_config\nfrom sklearn.utils.fixes import delayed\n\n\ndef get_working_memory():\n    return get_config()[\"working_memory\"]\n\n\n@pytest.mark.parametrize(\"n_jobs\", [1, 2])\n@pytest.mark.parametrize(\"backend\", [\"loky\", \"threading\", \"multiprocessing\"])\ndef test_configuration_passes_through_to_joblib(n_jobs, backend):\n    # Tests that the global global configuration is passed to joblib jobs\n\n    with config_context(working_memory=123):\n        results = Parallel(n_jobs=n_jobs, backend=backend)(\n            delayed(get_working_memory)() for _ in range(2)\n        )\n\n    assert_array_equal(results, [123] * 2)"
+        }
+      },
+      "core_domain": "terminalbench",
+      "aux_domain": "terminalbench",
+      "same_domain": true,
+      "event_seq": 234,
+      "original_call_id": "call_aux_92b26ee9bd",
+      "returned_call_id": "call_941774faba46327b"
+    },
+    {
+      "event": "aux_execution",
+      "session_id": "swebench-scikit-learn__scikit-learn-25363-1785486859416290705",
+      "account_id": "swebench-agentwm",
+      "core_round_index": 10,
+      "call_id": "call_941774faba46327b",
+      "aux_tool": "terminalbench__terminalbench_execute_bash",
+      "aux_arguments": {
+        "command": "git log --oneline -n 3 -- /testbed/sklearn/utils/tests/test_parallel.py"
+      },
+      "aux_observation": {
+        "exit_code": 0,
+        "output": "5f75acdd1 MNT Bump joblib version dependency to 1.0.0 (#22365)\n82df48934 MNT Applies black formatting to most of the code base (#18948)\n06d6f8a9f FIX Passes global configuration when spawning joblib jobs (#17634)"
+      },
+      "execution_success": true,
+      "created": 1785487153,
+      "event_seq": 235,
+      "original_call_id": "call_aux_92b26ee9bd",
+      "returned_call_id": "call_941774faba46327b"
+    },
+    {
+      "event": "aux_release",
+      "session_id": "swebench-scikit-learn__scikit-learn-25363-1785486859416290705",
+      "account_id": "swebench-agentwm",
+      "core_round_index": 12,
+      "call_id": "call_80eade1e0c8a286c",
+      "aux_tool": "terminalbench__terminalbench_execute_bash",
+      "aux_arguments": {
+        "command": "cd /testbed && git show --stat HEAD"
+      },
+      "argument_provenance": {
+        "command": "value"
+      },
+      "aux_semantic_role": "Inspect which files were modified in the most recent commit.",
+      "behavior_signature": "terminalbench__terminalbench_execute_bash|terminalbench__terminalbench_execute_bash|post_core",
+      "scores": {
+        "candidate_id": "candidate_03",
+        "relevance": 0.5,
+        "reliability": 1.0,
+        "repeat": 1.0,
+        "total": 0.825,
+        "behavior_signature": "terminalbench__terminalbench_execute_bash|terminalbench__terminalbench_execute_bash|post_core",
+        "reason": "Moderately relevant as it could show files modified in the most recent commit, potentially including changes related to the configuration passing issue. However, prior git log commands already provided sufficient context."
+      },
+      "sample": 0.08214063443217676,
+      "probability_before": 0.2,
+      "probability_after": 0.1,
+      "remaining_budget_before": 8,
+      "remaining_budget_after": 7,
+      "sequence": "post_core",
+      "created": 1785487235,
+      "core": {
+        "tool": "terminalbench__terminalbench_execute_bash",
+        "arguments": {
+          "command": "cd /testbed && git log --oneline -n 20"
+        },
+        "observation": {
+          "exit_code": 0,
+          "output": "cfd428afc FIX online updates in MiniBatchDictionaryLearning (#25354)\nd431d7e91 FIX Better support large or read-only datasets in `decomposition.DictionaryLearning` (#25172)\n026028332 DOC Add detail about dataframe passthrough columns (#25423)\n55eaa4ba5 FIX SplineTransformer.get_feature_names_out returns correct names for extrapolations=periodic (#25296)\ne010e4f00 MAINT make `AdditiveChi2Sampler` stateless and check that stateless `Transformers` don't raise `NotFittedError` (#25190)\n134c492bf CI Enable native osx-arm64 wheels on Python 3.8 (#25427)\neb8d45e66 MNT Reduces the number of runs for circleci redirector job (#25426)\n5f70c4468 BLD Update Cython minimum version to `0.29.33` (#25342)\n1e9829ae1 DOC Fix typo in LogisticRegressionCV (#25428)\n7c91462fd ENH Raise NotFittedError in get_feature_names_out for Imputers and Isotonic Regression (#25367)\na18a1edfe MAINT Parameters validation for metrics.median_absolute_error (#25410)\n8ce4a67ef MAINT Parameters validation for sklearn.metrics.hamming_loss (#25347)\nf1340c73a CI Adapt handling of discarded fused typed memoryview (#25425)\nd60af3de4 MNT fix test following scipy dev change (#25393)\n71a647f8b FIX expose fill_value in IterativeImputer (#25232)\n2e63d2e41 ENH Raise NotFittedError in get_feature_names_out for Stacking and Voting - Classifier and Regressor (#25324)\nd5fcb20b3 DOC fix name of estimator used when referring to code example (#25408)\n71ca9258d CI Update conda-lock from 1.2.1 to 1.3.0 (#25404)\n550fa9c28 MAINT Remove -Wcpp warnings when compiling sklearn.svm._libsvm_sparse (#25337)\nbf03a6354 ENH add feature_names_in_ in FeatureUnion (#25220)"
+        }
+      },
+      "core_domain": "terminalbench",
+      "aux_domain": "terminalbench",
+      "same_domain": true,
+      "event_seq": 308,
+      "original_call_id": "call_aux_524af09e92",
+      "returned_call_id": "call_80eade1e0c8a286c"
+    }
+  ]
+}
