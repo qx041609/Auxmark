@@ -82,7 +82,7 @@ python3 code/distill.py \
   --model /path/to/base-model
 ```
 
-This reads `output/BFCL/trace/GPT/D_c/train.jsonl` and writes LoRA output under `output/BFCL/training/GPT/D_c/GLM_4_7_Flash/`. A complete trace is one sample. System, user, and tool messages provide context; assistant text and tool calls receive loss. Training and detection share the text renderer in `code/detect.py`. Defaults include BF16, 16K maximum length, 20 epochs, LoRA rank 32/alpha 64, batch size 1, and gradient accumulation 2; inspect `python3 code/distill.py --help` and the recorded `run_config.json` before reproducing a particular run. `--moe` activates the existing GLM expert Parameter-LoRA branch. The public training directories contain configuration and statistics, but **no adapter weights**. 
+This reads `output/BFCL/trace/GPT/D_c/train.jsonl` and writes LoRA output under `output/BFCL/training/GPT/D_c/GLM_4_7_Flash/`. A complete trace is one sample. System, user, and tool messages provide context; assistant text and tool calls receive loss. Training and detection share the text renderer in `code/detect.py`. Defaults include BF16, 16K maximum length, 20 epochs, LoRA rank 32/alpha 64, batch size 1, and gradient accumulation 2; inspect `python3 code/distill.py --help` and the recorded `run_config.json` before reproducing a particular run. `--moe` activates the existing GLM expert Parameter-LoRA branch. The GitHub training directories contain configuration and statistics, but **no adapter weights**. Pretrained LoRA adapter weights are distributed separately on [Hugging Face](https://huggingface.co/AuxMark/AuxMark/tree/main).
 
 ### 3. Generate paired probes
 
