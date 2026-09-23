@@ -17,7 +17,6 @@ Run from the repository root. Every entry point accepts explicit paths; `--bench
 
 Traces use OpenAI-style `messages`, assistant `tool_calls`, tool observations, and the tool schema. `standard_traces/*.json` and `train.jsonl` are the final training-ready versions. `watermarked_traces` is the history visible to the agent. `watermark_evidence` contains Aux release/execution records and the mapping between internal and visible call IDs. Keep this evidence private if you generate a new watermark; the included release evidence is needed to reproduce the published probes.
 
-The text renderer lives in `detect.py` and is imported by `distill.py` and the SWEbench robustness builder. It serializes the tool schema into the system text and the conversation into a stable user text. Online replay requests text output and parses `<tool_call>`; it does not use the provider's structured tool API. The existing regexes that recognize Chinese watermark terms and quota/balance text are algorithmic input handling, not comments or filenames.
 
 ## Commands
 
