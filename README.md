@@ -1,6 +1,7 @@
 # Auxmark — anti-distillation watermark for agent traces
 
 AuxMark is a behavioral watermarking framework designed to trace and defend against unauthorized agent model distillation. The system works by dynamically inserting safe, non-essential "auxiliary actions" into the interaction trajectories of the teacher agent and saving the associated contexts as private evidence cards. When auditing a suspicious student model, AuxMark utilizes this private evidence to construct paired real and fake probes, verifying whether the student model has retained these watermarked behaviors through a card-level sign test. An optional trace-ranking step performs attribution analysis on candidate source traces after probe replay, Pretrained LoRA adapter weights are distributed separately on [Hugging Face](https://huggingface.co/AuxMark/AuxMark/tree/main).
+
 <img width="511" height="488" alt="overview" src="https://github.com/user-attachments/assets/f1c10745-57d5-4d2b-bdde-97e911187307" />
 
 
