@@ -71,7 +71,7 @@ python3 adapters/bfcl.py freeze --bench BFCL --teacher GPT --count 100
 python3 adapters/bfcl.py freeze --bench BFCL --teacher GPT --count 50
 ```
 
-`freeze` produces `S` (100 final candidate traces) and `D_c` (50 traces selected from S for training). Use the matching `collect`/`freeze` subcommands in `adapters/swebench.py` and `adapters/tau2.py` for those benchmarks. Frozen `standard_traces` and `train.jsonl` are the versions used downstream. `watermarked_traces` and `watermark_evidence` retain the agent-visible history and private release evidence needed for probe construction. The released SWEbench traces include the finalized real tool observations; the earlier collection snapshots are not training inputs.
+`freeze` produces `S` (100 final candidate traces) and `D_c` (50 traces selected from S for training).
 
 ### 2. Train a student (or use separately supplied weights)
 
@@ -82,9 +82,7 @@ python3 code/distill.py \
   --model /path/to/base-model
 ```
 
-This reads `output/BFCL/trace/GPT/D_c/train.jsonl` and writes LoRA output under `output/BFCL/training/GPT/D_c/GLM_4_7_Flash/`. A complete trace is one sample. System, user, and tool messages provide context; assistant text and tool calls receive loss. Training and detection share the text renderer in `code/detect.py`. Defaults include BF16, 16K maximum length, 20 epochs, LoRA rank 32/alpha 64, batch size 1, and gradient accumulation 2; inspect `python3 code/distill.py --help` and the recorded `run_config.json` before reproducing a particular run. `--moe` activates the existing GLM expert Parameter-LoRA branch.
-
-The public training directories contain configuration and statistics, but **no adapter weights**. For an already trained student, skip this step and supply the separately distributed adapter path when running detection. `training_args.bin` is a serialized Trainer configuration, not a model weight; it is not loaded by detection and is omitted from this release. Some historic `resume_from_checkpoint` fields name checkpoints that are likewise not shipped, so resuming those exact runs requires the original checkpoint files.
+This reads `output/BFCL/trace/GPT/D_c/train.jsonl` and writes LoRA output under `output/BFCL/training/GPT/D_c/GLM_4_7_Flash/`. A complete trace is one sample. System, user, and tool messages provide context; assistant text and tool calls receive loss. Training and detection share the text renderer in `code/detect.py`. Defaults include BF16, 16K maximum length, 20 epochs, LoRA rank 32/alpha 64, batch size 1, and gradient accumulation 2; inspect `python3 code/distill.py --help` and the recorded `run_config.json` before reproducing a particular run. `--moe` activates the existing GLM expert Parameter-LoRA branch. The public training directories contain configuration and statistics, but **no adapter weights**. 
 
 ### 3. Generate paired probes
 
