@@ -153,14 +153,3 @@ Auxmark/
 ```
 
 The four area directories exist **under each benchmark**. `<Teacher>` is `GPT` or `Kimi`. Public Kimi material is limited to S, D_c, probes, and baseline training/evaluation; Kimi robustness runs are excluded. GPT robustness conditions include dilution (`D1/D5/D10`), truncation (`T10/T15/T20`), mixing (`R1_1/R1_2/R1_3`), `D_c_Paraphrasing_attack`, and `D_c_Adaptive_attack`, where present. The attacks build separate training sets from D_c. See `output/README.md` for exact contents and known gaps.
-
-## Configuration and troubleshooting
-
-- **Credentials:** pass provider keys through environment variables or `--key-file`; never commit a real key. `model_config.py` also supports optional private provider JSON under `~/.config/agentwm/`. For embedding, use `AGENTWM_TEACHER_API_KEY`, `AGENTWM_AUX_API_KEY`, and `AGENTWM_SECRET_SEED`; online detection uses `OPENROUTER_API_KEY` or `--key-file`.
-- **Base model:** published `adapter_config.json` records only the base model's name, not the old machine path. Supply the matching locally installed base model with `--base-model`. An adapter from a different architecture or tokenizer will not load correctly.
-- **Historical metadata:** paths in public configs are repository-relative (`output/...`). Treat `run_config.json` as a record of the original settings, not an executable command line. External checkpoint, benchmark, and DeepSpeed paths may require local replacements.
-- **Missing probe or result side:** both real and fake `results.jsonl` are required for the paired report.
-- **Provider errors or low coverage:** check model ID, endpoint, key, tool-call text format, and each side's replay `results.jsonl`. A failed or truncated request cannot be repaired by changing the aggregate report.
-- **Collection mismatch:** freeze S before D_c, and keep the same bench/teacher combination throughout. Do not mix probes or weights from different conditions.
-
-The release changes path layout, names, and personal-path metadata. Core trace samples, probe/label rows, training data, and saved detection result JSON remain byte-identical to the collected versions. Original benchmark task payloads can contain container paths such as `/root/...`; those strings are part of the tasks and are intentionally preserved.
