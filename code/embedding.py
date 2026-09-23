@@ -32,6 +32,8 @@ RECORD_OUT_DIR = Path(os.getenv("AGENTWM_OUT_DIR", "/tmp/agentwm_embedding_uncon
 app = FastAPI(title="AgentWM Embedding Recorder")
 _SAFETY_CACHE: Dict[str, Dict[str, Any]] = {}
 _SAFETY_CACHE_LOCK = threading.Lock()
+_SAFETY_GENERATION_LOCKS: Dict[str, threading.Lock] = {}
+_SESSION_SAFETY_FINGERPRINTS: Dict[str, str] = {}
 
 
 def normalise_tools(value: Any) -> list[dict[str, Any]]:
@@ -51,8 +53,32 @@ def tool_schema_fingerprint(tools: list[dict[str, Any]]) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:24]
 
 
+def safety_policy_from_file(candidate: Path, tools: list[dict[str, Any]], fingerprint: str) -> Dict[str, Any] | None:
+    """Load one complete policy that matches the current tool table."""
+    names = {str((tool.get("function") or tool).get("name")) for tool in tools}
+    if not candidate.is_file():
+        return None
+    try:
+        record = json.loads(candidate.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(record, dict):
+        return None
+    if record.get("tool_schema_fingerprint") and record.get("tool_schema_fingerprint") != fingerprint:
+        return None
+    policy = record.get("policy") if isinstance(record.get("policy"), dict) else record
+    classified = policy.get("tools") if isinstance(policy.get("tools"), dict) else {}
+    if names and all(
+        isinstance(classified.get(name), dict)
+        and classified[name].get("risk") in {"read_only", "unknown"}
+        for name in names
+    ):
+        return policy
+    return None
+
+
 def supplied_safety_policy(tools: list[dict[str, Any]], fingerprint: str) -> Dict[str, Any] | None:
-    """Use a pre-processed matching policy if the caller supplied one.
+    """Use a matching policy from the optional caller-supplied cache.
 
     ``AGENTWM_SAFETY_PATH`` accepts either one JSON policy or a directory of
     ``<tool-schema-fingerprint>.json`` records previously emitted by this
@@ -65,21 +91,9 @@ def supplied_safety_policy(tools: list[dict[str, Any]], fingerprint: str) -> Dic
         return None
     path = Path(configured)
     candidates = [path / f"{fingerprint}.json"] if path.is_dir() else [path]
-    names = {str((tool.get("function") or tool).get("name")) for tool in tools}
     for candidate in candidates:
-        if not candidate.is_file():
-            continue
-        try:
-            record = json.loads(candidate.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if not isinstance(record, dict):
-            continue
-        if record.get("tool_schema_fingerprint") and record.get("tool_schema_fingerprint") != fingerprint:
-            continue
-        policy = record.get("policy") if isinstance(record.get("policy"), dict) else record
-        classified = policy.get("tools") if isinstance(policy.get("tools"), dict) else {}
-        if names and all(isinstance(classified.get(name), dict) and classified[name].get("risk") in {"read_only", "unknown"} for name in names):
+        policy = safety_policy_from_file(candidate, tools, fingerprint)
+        if policy is not None:
             return policy
     return None
 
@@ -221,49 +235,79 @@ def serve_proxy(args: argparse.Namespace) -> None:
 _AUX_CALL_ID_MAP: Dict[str, Dict[str, str]] = {}
 
 
-def runtime_safety_policy(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
-    """Parse one new live tool table once, then reuse its conservative policy.
+def runtime_safety_policy(payload: Dict[str, Any], session_id: str) -> Tuple[Dict[str, Any], str]:
+    """Bind one policy to a trace and generate at most once per tool table.
 
     This replaces a hand-maintained, benchmark-specific safety JSON.  The
     policy is private runtime metadata: it is attached only to the call into
-    ``watermark_proxy`` and is never passed to the teacher or agent.
+    ``watermark_proxy`` and is never passed to the teacher or agent. Policies
+    are reused from memory, the current output directory, or ``--safety-path``.
     """
     raw_tools = payload.get("tools") or []
     if not raw_tools:
         return {"tools": {}, "prefixes": [], "default_risk": "unknown"}, "no_tools"
     tools = normalise_tools(raw_tools)
     fingerprint = tool_schema_fingerprint(tools)
-    with _SAFETY_CACHE_LOCK:
-        cached = _SAFETY_CACHE.get(fingerprint)
-    if cached is not None:
-        return cached, fingerprint
 
-    policy = supplied_safety_policy(tools, fingerprint)
-    source = "provided"
-    if policy is None:
-        source = "llm_generated"
-        safety_key = auxiliary_api_key()
-        if not safety_key:
-            raise RuntimeError(
-                "AGENTWM_AUX_API_KEY is required for the tool-safety classifier."
-            )
-        policy = classify_tool_safety(
-            tools,
-            auxiliary_base_url(),
-            safety_key,
-            os.getenv("AGENTWM_SAFETY_MODEL") or os.getenv("AGENTWM_FILTER_MODEL") or core.engine().teacher_model,
-            int(os.getenv("AGENTWM_SAFETY_MAX_TOKENS", "4000")),
-        )
     with _SAFETY_CACHE_LOCK:
-        _SAFETY_CACHE[fingerprint] = policy
-    _atomic_json(RECORD_OUT_DIR / "safety_policies" / f"{fingerprint}.json", {
-        "schema": "agentwm_runtime_tool_safety_v1",
-        "tool_schema_fingerprint": fingerprint,
-        "tools": tools,
-        "policy": policy,
-        "source": source,
-        "generated_at": int(time.time()),
-    })
+        bound = _SESSION_SAFETY_FINGERPRINTS.get(session_id)
+        if bound is not None and bound != fingerprint:
+            raise RuntimeError(
+                f"tool schema changed within session {session_id!r}: {bound} -> {fingerprint}"
+            )
+        cached = _SAFETY_CACHE.get(fingerprint)
+        if cached is not None:
+            _SESSION_SAFETY_FINGERPRINTS[session_id] = fingerprint
+            return cached, fingerprint
+        generation_lock = _SAFETY_GENERATION_LOCKS.setdefault(fingerprint, threading.Lock())
+
+    # Different tool tables may be classified concurrently, while concurrent
+    # first requests for the same table wait for one generator (single-flight).
+    with generation_lock:
+        with _SAFETY_CACHE_LOCK:
+            cached = _SAFETY_CACHE.get(fingerprint)
+        if cached is not None:
+            policy = cached
+        else:
+            policy = supplied_safety_policy(tools, fingerprint)
+            source = "provided"
+            cache_path = RECORD_OUT_DIR / "safety_policies" / f"{fingerprint}.json"
+            if policy is None:
+                policy = safety_policy_from_file(cache_path, tools, fingerprint)
+                source = "disk_cache"
+            if policy is None:
+                source = "llm_generated"
+                safety_key = auxiliary_api_key()
+                if not safety_key:
+                    raise RuntimeError(
+                        "AGENTWM_AUX_API_KEY is required for the tool-safety classifier."
+                    )
+                policy = classify_tool_safety(
+                    tools,
+                    auxiliary_base_url(),
+                    safety_key,
+                    os.getenv("AGENTWM_SAFETY_MODEL") or os.getenv("AGENTWM_FILTER_MODEL") or core.engine().teacher_model,
+                    int(os.getenv("AGENTWM_SAFETY_MAX_TOKENS", "4000")),
+                )
+            if source != "disk_cache":
+                _atomic_json(cache_path, {
+                    "schema": "agentwm_runtime_tool_safety_v1",
+                    "tool_schema_fingerprint": fingerprint,
+                    "tools": tools,
+                    "policy": policy,
+                    "source": source,
+                    "generated_at": int(time.time()),
+                })
+            with _SAFETY_CACHE_LOCK:
+                _SAFETY_CACHE[fingerprint] = policy
+
+    with _SAFETY_CACHE_LOCK:
+        bound = _SESSION_SAFETY_FINGERPRINTS.get(session_id)
+        if bound is not None and bound != fingerprint:
+            raise RuntimeError(
+                f"tool schema changed within session {session_id!r}: {bound} -> {fingerprint}"
+            )
+        _SESSION_SAFETY_FINGERPRINTS[session_id] = fingerprint
     return policy, fingerprint
 
 
@@ -507,7 +551,7 @@ def aux_status(session_id: str) -> Dict[str, Any]:
 def chat_completions(payload: Dict[str, Any], request: Request) -> Dict[str, Any]:
     try:
         session_id = core.session_id_from_request(payload, request)
-        safety, _ = runtime_safety_policy(payload)
+        safety, _ = runtime_safety_policy(payload, session_id)
         core_payload = dict(payload)
         core_payload["_agentwm_safety"] = safety
         response = core.chat_completions(core_payload, request)
