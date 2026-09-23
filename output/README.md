@@ -19,6 +19,3 @@ Within an area, data is grouped by `GPT` or `Kimi`. The release has six final S 
 
 GPT robustness training sets live under `trace/GPT/` with names such as `D1`, `D5`, `D10` (dilution), `T10`, `T15`, `T20` (truncation), `R1_1`, `R1_2`, `R1_3` (mixing), `D_c_Paraphrasing_attack`, and `D_c_Adaptive_attack`. Presence varies by benchmark. A trace condition without matching training or evaluation artifacts is a released dataset, not evidence that an evaluation was run. Kimi robustness artifacts are not public.
 
-All personal machine paths in released metadata were rewritten to repository-relative `output/...` references or base-model names. Paths to external SWEbench tasks are recorded as `external_tasks/<task-id>` and require a user-provided task root for new collection. Historical checkpoint references identify where a checkpoint belonged but some referenced checkpoints are omitted with the weights. Original benchmark task text and tool observations are preserved, including task-container paths needed to interpret them.
-
-For commands and report interpretation, start with the repository root `README.md` and `code/README.md`.
