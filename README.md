@@ -1,8 +1,9 @@
 # Auxmark — anti-distillation watermark for agent traces
 
-Auxmark embeds a statistical watermark in a teacher agent's tool-use traces. It records the trace seen by the agent, trains a student on selected traces, builds paired probes from watermark release evidence, and measures whether the student retained the watermarked behavior. The optional trace-ranking step ranks candidate source traces after probe replay. The detector evaluates **traces and their paired probes**, not user accounts.
+AuxMark is a behavioral watermarking framework designed to trace and defend against unauthorized agent model distillation. The system works by dynamically inserting safe, non-essential "auxiliary actions" into the interaction trajectories of the teacher agent and saving the associated contexts as private evidence cards. When auditing a suspicious student model, AuxMark utilizes this private evidence to construct paired real and fake probes, verifying whether the student model has retained these watermarked behaviors through a card-level sign test. An optional trace-ranking step performs attribution analysis on candidate source traces after probe replay.
+<img width="511" height="488" alt="屏幕截图 2026-09-23 192423" src="https://github.com/user-attachments/assets/f267be48-3273-47eb-aa68-27e08339f781" />
 
-This release contains the final trace, probe, training metadata, and evaluation data for BFCL, SWEbench, and Tau2. It also contains the embedding, training, probe-generation, detection, ranking, and benchmark-adapter code. **LoRA weights are distributed separately**; point local detection at the downloaded adapter. Existing evaluation JSON and per-probe results can be inspected without weights or API access.
+
 
 ## Install
 
@@ -38,7 +39,7 @@ python3 code/rank_traces.py \
   --model GLM_4_7_Flash --known-dc
 ```
 
-This reads saved probe labels and replay `results.jsonl`, and writes `trace_ranking/trace_ranking.jsonl` and `ranking_summary.json` under that evaluation directory. It makes no model request. Omit `--known-dc` when the training subset is unknown. For Tau2 retry-aware collections, add `--accepted output/Tau2/trace/GPT/S/accepted.jsonl` if you want to restrict the ranking to accepted sessions.
+This reads saved probe labels and replay `results.jsonl`, and writes `trace_ranking/trace_ranking.jsonl` and `ranking_summary.json` under that evaluation directory. It makes no model request. Omit `--known-dc` when the training subset is unknown.
 
 ## Full workflow
 
