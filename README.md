@@ -1,7 +1,8 @@
 # Auxmark — anti-distillation watermark for agent traces
 
-AuxMark is a behavioral watermarking framework designed to trace and defend against unauthorized agent model distillation. The system works by dynamically inserting safe, non-essential "auxiliary actions" into the interaction trajectories of the teacher agent and saving the associated contexts as private evidence cards. When auditing a suspicious student model, AuxMark utilizes this private evidence to construct paired real and fake probes, verifying whether the student model has retained these watermarked behaviors through a card-level sign test. An optional trace-ranking step performs attribution analysis on candidate source traces after probe replay.
-<img width="511" height="488" alt="屏幕截图 2026-09-23 192423" src="https://github.com/user-attachments/assets/f267be48-3273-47eb-aa68-27e08339f781" />
+AuxMark is a behavioral watermarking framework designed to trace and defend against unauthorized agent model distillation. The system works by dynamically inserting safe, non-essential "auxiliary actions" into the interaction trajectories of the teacher agent and saving the associated contexts as private evidence cards. When auditing a suspicious student model, AuxMark utilizes this private evidence to construct paired real and fake probes, verifying whether the student model has retained these watermarked behaviors through a card-level sign test. An optional trace-ranking step performs attribution analysis on candidate source traces after probe replay, Pretrained LoRA adapter weights are distributed separately on [Hugging Face](https://huggingface.co/AuxMark/AuxMark/tree/main).
+<img width="511" height="488" alt="overview" src="https://github.com/user-attachments/assets/f1c10745-57d5-4d2b-bdde-97e911187307" />
+
 
 
 
@@ -39,7 +40,7 @@ python3 code/rank_traces.py \
   --model GLM_4_7_Flash --known-dc
 ```
 
-This reads saved probe labels and replay `results.jsonl`, and writes `trace_ranking/trace_ranking.jsonl` and `ranking_summary.json` under that evaluation directory. It makes no model request. Omit `--known-dc` when the training subset is unknown.
+This reads saved probe labels and replay `results.jsonl`, and writes `trace_ranking/trace_ranking.jsonl` and `ranking_summary.json` under that evaluation directory. It makes no model request. Omit `--known-dc` when the training subset is unknown. 
 
 ## Full workflow
 
@@ -82,7 +83,7 @@ python3 code/distill.py \
   --model /path/to/base-model
 ```
 
-This reads `output/BFCL/trace/GPT/D_c/train.jsonl` and writes LoRA output under `output/BFCL/training/GPT/D_c/GLM_4_7_Flash/`. A complete trace is one sample. System, user, and tool messages provide context; assistant text and tool calls receive loss. Training and detection share the text renderer in `code/detect.py`. Defaults include BF16, 16K maximum length, 20 epochs, LoRA rank 32/alpha 64, batch size 1, and gradient accumulation 2; inspect `python3 code/distill.py --help` and the recorded `run_config.json` before reproducing a particular run. `--moe` activates the existing GLM expert Parameter-LoRA branch. The GitHub training directories contain configuration and statistics, but **no adapter weights**. Pretrained LoRA adapter weights are distributed separately on [Hugging Face](https://huggingface.co/AuxMark/AuxMark/tree/main).
+This reads `output/BFCL/trace/GPT/D_c/train.jsonl` and writes LoRA output under `output/BFCL/training/GPT/D_c/GLM_4_7_Flash/`. A complete trace is one sample. System, user, and tool messages provide context; assistant text and tool calls receive loss. Training and detection share the text renderer in `code/detect.py`. Defaults include BF16, 20 epochs, LoRA rank 32/alpha 64, batch size 1, and gradient accumulation 2; inspect `python3 code/distill.py --help` and the recorded `run_config.json` before reproducing a particular run. `--moe` activates the existing GLM expert Parameter-LoRA branch. The GitHub training directories contain configuration and statistics, but **no adapter weights**. Pretrained LoRA adapter weights are distributed separately on [Hugging Face](https://huggingface.co/AuxMark/AuxMark/tree/main).
 
 ### 3. Generate paired probes
 
