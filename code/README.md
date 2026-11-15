@@ -17,6 +17,9 @@ Run from the repository root. Every entry point accepts explicit paths; `--bench
 
 Traces use OpenAI-style `messages`, assistant `tool_calls`, tool observations, and the tool schema. `standard_traces/*.json` and `train.jsonl` are the final training-ready versions. `watermarked_traces` is the history visible to the agent. `watermark_evidence` contains Aux release/execution records and the mapping between internal and visible call IDs. Keep this evidence private if you generate a new watermark; the included release evidence is needed to reproduce the published probes.
 
+Candidate generation now defaults to compact lines such as `Check status | tool_name(id=ref("core_observation.id"))`, or `NONE` when no optional action is valid. The proxy parses literals without executing model text, converts valid lines to the existing candidate JSON structure, then applies the same safety, binding, and scoring checks. Set `AGENTWM_CANDIDATE_OUTPUT_FORMAT=json` to request the earlier JSON format. The compact output limit defaults to 600 tokens and can be overridden with `AGENTWM_CANDIDATE_MAX_TOKENS`.
+
+Compact candidate text is internal transport only. `standard_traces`, `watermarked_traces`, and `train.jsonl` contain the processed assistant `Thought:` and structured `tool_calls` with real tool observations. They never use the candidate model's raw compact lines as assistant turns. A malformed raw response may appear only in the private `full_traces.jsonl` diagnostic event.
 
 ## Commands
 

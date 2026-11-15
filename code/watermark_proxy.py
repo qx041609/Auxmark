@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import itertools
 import json
@@ -183,6 +184,20 @@ Field rules:
 
 If and only if no valid candidate exists, return exactly:
 {{"should_add_aux": false, "reason": "brief reason", "candidates": []}}
+""".strip()
+
+CANDIDATE_COMPACT_FORMAT = """
+OUTPUT FORMAT: Start immediately with either NONE or one candidate per line.
+Write no analysis, introduction, JSON, markdown, or closing text.
+Each candidate line is: short reason | exact_tool_name(arg=value, ...)
+Use Python scalar literals for values: quoted strings, numbers, True, or False.
+For a value taken from the supplied context, use ref("core_observation.field")
+or ref("core_action.arguments.field") in place of the value.
+Return at most {k} distinct, valid lines. The caller assigns candidate IDs.
+Examples:
+Inspect the file contents | cat(file_name="report.txt")
+Check the line count | wc(file_name="report.txt", mode="l")
+If no valid optional check exists, return exactly NONE.
 """.strip()
 
 
@@ -742,6 +757,55 @@ def candidate_response_shape_ok(value: Any) -> bool:
     return True
 
 
+def parse_compact_candidate_response(raw: str, limit: int) -> Dict[str, Any]:
+    """Turn short, literal tool-call lines into the existing candidate schema."""
+    lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    if lines and lines[0] == "NONE":
+        return {"should_add_aux": False, "reason": "no_valid_candidate", "candidates": []}
+    candidates: List[Dict[str, Any]] = []
+    for line in lines:
+        if " | " not in line:
+            continue
+        thought, call_text = (part.strip() for part in line.split(" | ", 1))
+        if not thought:
+            continue
+        try:
+            call = ast.parse(call_text, mode="eval").body
+        except SyntaxError:
+            continue
+        if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Name) or call.args:
+            continue
+        plan: Dict[str, Any] = {}
+        for keyword in call.keywords:
+            if keyword.arg is None or keyword.arg in plan:
+                break
+            value = keyword.value
+            if (isinstance(value, ast.Call) and isinstance(value.func, ast.Name)
+                    and value.func.id == "ref" and len(value.args) == 1
+                    and not value.keywords and isinstance(value.args[0], ast.Constant)
+                    and isinstance(value.args[0].value, str)):
+                plan[keyword.arg] = {"source": value.args[0].value}
+            else:
+                try:
+                    literal = ast.literal_eval(value)
+                except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+                    break
+                if not _is_scalar(literal):
+                    break
+                plan[keyword.arg] = {"value": literal}
+        else:
+            candidates.append({
+                "candidate_id": f"candidate_{len(candidates) + 1:02d}",
+                "thought": thought, "tool": call.func.id,
+                "argument_plan": plan,
+            })
+            if len(candidates) >= limit:
+                break
+    if candidates:
+        return {"should_add_aux": True, "reason": "compact_candidates", "candidates": candidates}
+    return {}
+
+
 def clamp_score(value: Any) -> float:
     try:
         return max(0.0, min(1.0, float(value)))
@@ -1209,6 +1273,7 @@ class WatermarkEngine:
         observation = matching_observation(payload.get("messages") or [], pending.core_call_id)
         if observation is None:
             return [], "core_observation_missing"
+        compact_format = os.getenv("AGENTWM_CANDIDATE_OUTPUT_FORMAT", "compact").strip().lower() == "compact"
         catalog, catalog_meta = compact_tool_catalog(payload.get("tools"), core_tool=pending.core_tool, max_chars=12000)
         all_messages = payload.get("messages") or []
         # The benchmark procedure often lives in the initial system message and
@@ -1222,12 +1287,45 @@ class WatermarkEngine:
             and str(message.get("content") or "").strip()
         ]
         recent_context = all_messages[-8:]
+        if compact_format:
+            source_hint = (
+                "The following source paths may be used inside ref(...): core_action, "
+                "core_observation, prior_observation, user_request.\n\n"
+            )
+            format_instruction = (
+                "Return only compact candidate lines in the system-message format. "
+                "Start with the first line immediately; if none are valid, return NONE. "
+                "Do not print your analysis."
+            )
+            candidate_instruction = (
+                CANDIDATE_INSTRUCTION.split("=== OUR CANDIDATE DATA STRUCTURE", 1)[0]
+                .replace(
+                    "Return should_add_aux=false\nwhenever no candidate satisfies every condition above; an empty candidate list\nis preferable to a normal task continuation.",
+                    "Return NONE whenever no candidate satisfies every condition above.",
+                ).replace(
+                    "should_add_aux=false with an empty candidates list.",
+                    "NONE.",
+                ).rstrip()
+                + "\n\n" + CANDIDATE_COMPACT_FORMAT.format(k=self.k)
+            )
+        else:
+            source_hint = (
+                "You may and should use these exact source names in argument_plan: "
+                "core_action, core_observation, prior_observation, user_request, literal.\n\n"
+            )
+            format_instruction = (
+                "Respond with OUR CANDIDATE DATA STRUCTURE only (see system message). "
+                "Example skeleton with concrete value form:\n"
+                f"{stable_json({'should_add_aux': True, 'reason': 'example', 'candidates': [{'candidate_id': 'candidate_01', 'thought': 'verify related id', 'tool': (list(catalog.keys())[0] if catalog else 'exact_tool_name'), 'argument_plan': {'id': {'value': 'example_id'}}}]})}\n\n"
+                "Generate candidates now from this context. Do not say the core action "
+                "or core observation is missing; they are provided explicitly above."
+            )
+            candidate_instruction = CANDIDATE_INSTRUCTION.format(k=self.k)
         user_prompt = (
             "ORIGINAL_SYSTEM_INSTRUCTIONS (authoritative; preserve their exact workflow):\n"
             f"{stable_json(original_system)[:16000]}\n\n"
-            "The fields below are the real post-core context. You may and should "
-            "use these exact source names in argument_plan: core_action, "
-            "core_observation, prior_observation, user_request, literal.\n\n"
+            "The fields below are the real post-core context. "
+            f"{source_hint}"
             "CORE_ACTION is the primary tool call that just ran:\n"
             f"{stable_json({'tool': pending.core_tool, 'arguments': pending.core_arguments})[:4000]}\n\n"
             "CORE_OBSERVATION is the real result returned by that primary tool. "
@@ -1242,18 +1340,16 @@ class WatermarkEngine:
             f"domain={catalog_meta.get('domain_tools')} total={catalog_meta.get('total_tools')}; "
             f"same_domain_only={catalog_meta.get('same_domain_only')}; "
             f"core_prefix={catalog_meta.get('core_prefix')})\n\n"
-            "Respond with OUR CANDIDATE DATA STRUCTURE only (see system message). "
-            "Example skeleton with concrete value form:\n"
-            f"{stable_json({'should_add_aux': True, 'reason': 'example', 'candidates': [{'candidate_id': 'candidate_01', 'thought': 'verify related id', 'tool': (list(catalog.keys())[0] if catalog else 'exact_tool_name'), 'argument_plan': {'id': {'value': 'example_id'}}}]})}\n\n"
-            "Generate candidates now from this context. Do not say the core action "
-            "or core observation is missing; they are provided explicitly above."
+            f"{format_instruction}"
         )
         prompt = [
-            {"role": "system", "content": CANDIDATE_INSTRUCTION.format(k=self.k)},
+            {"role": "system", "content": candidate_instruction},
             {"role": "user", "content": user_prompt},
         ]
-        # Reasoning models (e.g. Kimi K2.5) may spend many tokens before JSON.
-        cand_max_tokens = int(os.getenv("AGENTWM_CANDIDATE_MAX_TOKENS", "2500"))
+        # Compact text keeps the candidate serialization budget small.
+        cand_max_tokens = int(os.getenv(
+            "AGENTWM_CANDIDATE_MAX_TOKENS", "600" if compact_format else "2500"
+        ))
         try:
             candidate_kwargs: Dict[str, Any] = {
                 "model": self.teacher_model,
@@ -1273,7 +1369,9 @@ class WatermarkEngine:
             message = choice.message if choice is not None else None
             raw_content = message_text_content(message)
             finish_reason = getattr(choice, "finish_reason", None) if choice is not None else None
-            value = extract_json(raw_content)
+            value = parse_compact_candidate_response(raw_content, self.k) if compact_format else extract_json(raw_content)
+            if compact_format and not value:
+                value = extract_json(raw_content)
             reason = str(value.get("reason") or ("empty_model_response" if not raw_content else "teacher_declined"))
             candidates = value.get("candidates", [])
             raw_candidate_count = len(candidates) if isinstance(candidates, list) else 0
